@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
     This is an example of a bot for the 3rd project.
@@ -135,7 +135,7 @@ def parse_info_about_player():
 
     It can look like this:
 
-    $$$ exec p2 : [./player1.py]
+    $$$ exec p2 : [./player1]
     """
     i = input()
     debug(f"Info about the player: {i}")
