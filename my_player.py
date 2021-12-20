@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 from logging import DEBUG, debug, getLogger
 import copy
-import math
+import time
 
 """ 
  To do:
@@ -44,7 +44,7 @@ def parse_field_info():
     """
     l = input()
     height, width = map(int, l[8:-1].split(' '))
-    debug(f"Height: {height}, width {width}")
+    # debug(f"Height: {height}, width {width}")
     return height
 
 
@@ -113,23 +113,75 @@ def parse_figure(player):
     ..
 
     :param player: 1 if player is playing first (O`s), 2 if second (X`s)
+    :return (figure, (offset_y, offset_x)) - parsed and cut figure and offset
     """
     l = input().strip()
     height, width = map(int, l[6:-1].split(' '))
-    debug(f"Figure height: {height}")
-    debug(f"Figure width: {width}")
+    # debug(f"Figure height: {height}")
+    # debug(f"Figure width: {width}")
     figure = []
     for _ in range(height):
         l = input()
         if int(player) == 1:
-            l = l.replace('*', 'o')
+            l = l.replace('*', 'O')
         else:
-            l = l.replace('*', 'x')
+            l = l.replace('*', 'X')
         row = list(l)
         figure.append(row)
-    debug(f"Figure: {figure}")
-    return figure
+    #debug(f"Figure: {figure}")
+    figure, offset = cut_figure(figure)
+    return figure, offset
 
+
+def cut_figure(figure):
+    """
+    Cuts figure (removes excessive dots)
+    :param figure: list of list. Example: [['.', 'O', '.'],
+                                           ['.', 'O', '.']]
+    :return: (figure: [['O'],
+                      ['O']], offset: (2,1))
+    """
+    new_figure = copy.deepcopy(figure)
+    offset_y = 0
+    offset_x = 0
+    top_flag = True
+    left_flag = True
+    bottom_flag = True
+    right_flag = True
+    while top_flag or left_flag or bottom_flag or right_flag:
+        # TOP
+        for x in range(len(new_figure[0])):
+            if new_figure[0][x] != '.':
+                top_flag = False
+                break
+        if top_flag:
+            new_figure = new_figure[1:]
+            offset_y += 1
+        #LEFT
+        for y in range(len(new_figure)):
+            if new_figure[y][0] != '.':
+                left_flag = False
+                break
+        if left_flag:
+            for y in range(len(new_figure)):
+                new_figure[y] = new_figure[y][1:]
+            offset_x += 1
+        #BOTTOM
+        for x in range(len(new_figure[-1])):
+            if new_figure[-1][x] != '.':
+                bottom_flag = False
+                break
+        if bottom_flag:
+            new_figure = new_figure[:-1]
+        # RIGHT
+        for y in range(len(new_figure)):
+            if new_figure[y][-1] != '.':
+                right_flag = False
+                break
+        if right_flag:
+            for y in range(len(new_figure)):
+                new_figure[y] = new_figure[y][:-1]
+    return new_figure, (offset_y, offset_x)
 
 def place_figure(figure_coords, figure, table):
     """
@@ -201,7 +253,7 @@ def heuristic_distance(start_point, finish_point):
     :param finish_point: (y,x)
     :return: float - distance between two points
     """
-    return math.sqrt((finish_point[0]-start_point[0])**2 + (finish_point[1]-start_point[1])**2)
+    return abs((finish_point[0]-start_point[0])) + abs((finish_point[1]-start_point[1]))
 
 def choose_base_point(table, player):
     """
@@ -267,12 +319,12 @@ def step(player: int):
     move = None
     height = parse_field_info()
     table = parse_field(height)
-    figure = parse_figure(player)
+    figure, offset = parse_figure(player)
     placement_coords = choose_placement(table, figure, player)
     if placement_coords == -1:
         debug("Error! There is no way to place this figure right!")
-        return [0, 0]
-    return list(placement_coords)
+        return [0,0]
+    return list((placement_coords[0]-offset[0], placement_coords[1]-offset[1]))
 #
 #
 def play(player: int):
@@ -283,6 +335,7 @@ def play(player: int):
     """
     while True:
         move = step(player)
+        #time.sleep(0.5)
         print(*move)
 
 
@@ -295,7 +348,7 @@ def parse_info_about_player():
     $$$ exec p2 : [./player1]
     """
     i = input()
-    debug(f"Info about the player: {i}")
+    # debug(f"Info about the player: {i}")
     return 1 if "p1 :" in i else 2
 
 
@@ -332,4 +385,10 @@ if __name__ == "__main__":
     #                          ['.','.','.','.','.',],
     #                          ['.','.','.','.','.',]], [['.', 'O', '.'],
     #                                                    ['.', 'O', '.']], 1))
+    # print(cut_figure([['.','.','.','.','.'],
+    #                   ['.','.','.','O','.'],
+    #                   ['.','.','O','O','.'],
+    #                   ['.','.','.','.','.'],
+    #                   ['.','.','.','.','.'],
+    #                   ]))
     main()
