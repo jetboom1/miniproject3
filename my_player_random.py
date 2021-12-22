@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-import math
 from logging import DEBUG, debug, getLogger
 import copy
 import time
+import random
 
 """ 
  To do:
@@ -239,9 +239,10 @@ def all_placements_by_rules(table, figure, point, player):
                                if new_table[row][x_chip] == enemy_chip])
             new_chip_count = len(new_my_chips)
             new_enemy_chip_count = len(new_enemy_chips)
+            is_starting_chip_left = True if new_table[point[0]][point[1]] == chip else False
             if (chip_count + figure_chip_count - 1) == new_chip_count and \
                     my_chips.issubset(new_my_chips) and enemy_chips.issubset(new_enemy_chips) \
-                    and not_broken:
+                    and not_broken and is_starting_chip_left:
                 possible_variants.append((y,x))
     return possible_variants
 
@@ -251,50 +252,40 @@ def heuristic_distance(start_point, finish_point):
     (coordinates of our extreme and extreme point of the enemy),
     :param start_point: (y,x)
     :param finish_point: (y,x)
-    :return: int - manhattan distance between two points
+    :return: float - distance between two points
     """
-    return math.sqrt((finish_point[0]-start_point[0])**2 + (finish_point[1]-start_point[1])**2)
+    return abs((finish_point[0]-start_point[0])) + abs((finish_point[1]-start_point[1]))
 
-def choose_base_point(table, player, direction):
+def choose_base_point(table, player):
     """
     - Function that selects the best point as the starting point for the next figure, based on the heuristic distance
      Accepts the field and the player's number. Returns a tuple (y, x)
     :param table: list of lists
     :param player: 1 if player is playing first (O`s), 2 if second (X`s)
-    :param direction: tuple of a 2 elements, represents the direction we need to follow. Example: (3, 3) - center
-                                                                                                  (3, 0) - left
     :return: list of tuples [(y,x),(y,x)] - 1 element: coordinates of the basis point for the next figure
                                             2 element: coordinates of the enemy basis point
     """
-    enemy_chips = set()
-    chips = set()
+    enemy_chips = []
+    chips = []
     min_h_dist = False
     chip = 'O' if player == 1 else 'X'
     en_chip = 'X' if player == 1 else 'O'
     for y in range(len(table)):
         for x in range(len(table[y])):
             if table[y][x] == chip:
-                chips.add((y, x))
+                chips.append((y, x))
             elif table[y][x] == en_chip:
-                enemy_chips.add((y, x))
-    if direction != 'enemy':
-        for my_chip in chips:
-            h_dist = heuristic_distance(my_chip, direction)
+                enemy_chips.append((y, x))
+    for my_chip in chips:
+        for enemy_chip in enemy_chips:
+            h_dist = heuristic_distance(my_chip, enemy_chip)
             if not min_h_dist:
-                min_h_dist = [h_dist, [my_chip, direction]]
+                min_h_dist = [h_dist, [my_chip, enemy_chip]]
             if h_dist < min_h_dist[0]:
-                min_h_dist = [h_dist, [my_chip, direction]]
-    else:
-        for my_chip in chips:
-            for enemy_chip in enemy_chips:
-                h_dist = heuristic_distance(my_chip, enemy_chip)
-                if not min_h_dist:
-                    min_h_dist = [h_dist, [my_chip, enemy_chip]]
-                if h_dist < min_h_dist[0]:
-                    min_h_dist = [h_dist, [my_chip, enemy_chip]]
-    return min_h_dist
+                min_h_dist = [h_dist, [my_chip, enemy_chip]]
+    return min_h_dist[1]
 
-def choose_placement(table, figure, player, flags):
+def choose_placement(table, figure, player):
     """
     - A function that selects the best shape for the figure based on the heuristic distance
      takes a table, list of tuples of 2 elements (coordinates of the location of the figure),
@@ -302,108 +293,52 @@ def choose_placement(table, figure, player, flags):
      :param table: list of lists
      :param figure: two-dimensional massive. Example: [['.', 'O'], ['O', 'O']]
      :param player: 1 if player is playing first (O`s), 2 if second (X`s)
-     :param flags: bool, (center_flag, right_flag, left_flag, up_flag, bottom_flag)
-     :return: figure_coords: list of lists
+     :return: table: list of lists
     """
-
     min_h_dist = False
-    direction, flags = choose_direction(table, player, flags)
-    distance, (base_point, goal_point) = choose_base_point(table, player, direction)
-    debug(f'Base point: {base_point}, goal point: {goal_point}, distance: {distance}')
+    base_point = choose_base_point(table, player)[0]
     variants = all_placements_by_rules(table, figure, base_point, player)
-    for figure_coords in variants:
-        new_table = place_figure(figure_coords, figure, table)
-        h_dist = choose_base_point(new_table, player, direction)
-        if not min_h_dist or h_dist[0] <= min_h_dist[0]:
-            min_h_dist = h_dist
-            min_h_dist.append(figure_coords)
-    if not min_h_dist:
-        return -1, -1
-    #result_table = place_figure(min_h_dist[-1], figure, table)
-    debug(f'flags:{flags}')
-    return min_h_dist[-1], flags
+    # for figure_coords in variants:
+    #     new_table = place_figure(figure_coords, figure, table)
+    #     h_dist = choose_base_point(new_table, player)
+    #     if not min_h_dist or min_h_dist[0] < choose_base_point(new_table, player)[0]:
+    #         min_h_dist = h_dist
+    #         min_h_dist.append(figure_coords)
+    # if not min_h_dist:
+    #     return -1
+    # #result_table = place_figure(min_h_dist[-1], figure, table)
+    # return min_h_dist[-1]
+    if not variants:
+        return -1
+    return random.choice(variants)
 
 
-def choose_direction(table, player, flags):
-    """
-    Chooses direction
-    :param table: table
-    :param player: 1 or 2
-    :param flags: bool, (center_flag, right_flag, left_flag, up_flag, bottom_flag)
-    :return: (y,x) - coordinates of a goal point
-    """
-    rows = len(table)
-    columns = len(table[0])
-    directions = {'center': (rows//2, columns//2), 'right': (rows//2, columns-1), 'left': (rows//2, 0),
-                  'bottom': (rows-1, columns//2), 'up': (0, columns//2), 'enemy': 'enemy'}
-    chip = 'O' if player == 1 else 'X'
-    enemy_chip = 'O' if player == 2 else 'X'
-    direction_str = 'center'
-    center_flag, right_flag, left_flag, up_flag, bottom_flag = flags
-    if player == 1:
-        if table[rows // 2][columns // 2] == chip or table[rows // 2][columns // 2] == enemy_chip:
-            direction_str = 'right'
-            center_flag = True
-        if center_flag and (table[rows // 2][columns - 1] == chip or table[rows // 2][columns - 1] == enemy_chip):
-            direction_str = 'bottom'
-            right_flag = True
-        if right_flag and table[rows-1][columns//2] == chip or table[rows-1][columns//2] == enemy_chip:
-            direction_str = 'up'
-            bottom_flag = True
-        if bottom_flag and table[0][columns//2] == chip or table[0][columns//2] == enemy_chip:
-            direction_str = 'left'
-            up_flag = True
-        if up_flag and table[rows//2][0] == chip or table[rows//2][0] == enemy_chip:
-            direction_str = 'enemy'
-            left_flag = True
-    else:
-        if table[rows // 2][columns // 2] == chip or table[rows // 2][columns // 2] == enemy_chip:
-            direction_str = 'left'
-            center_flag = True
-        if center_flag and (table[rows//2][0] == chip or table[rows//2][0] == enemy_chip):
-            direction_str = 'up'
-            left_flag = True
-        if left_flag and center_flag and (table[0][columns//2] == chip or table[0][columns//2] == enemy_chip):
-            direction_str = 'right'
-            up_flag = True
-        if up_flag and left_flag and center_flag and \
-                (table[rows // 2][columns - 1] == chip or table[rows // 2][columns - 1] == enemy_chip):
-            direction_str = 'bottom'
-            right_flag = True
-        if right_flag and up_flag and center_flag and left_flag\
-                and (table[rows-1][columns//2] == chip or table[rows-1][columns//2] == enemy_chip):
-            direction_str = 'enemy'
-            bottom_flag = True
-    debug(f'DIRECTION:{chip}, {direction_str}')
-    return directions[direction_str], (center_flag, right_flag, left_flag, up_flag, bottom_flag)
-
-
-def step(player: int, flags):
+def step(player: int):
     """
     Perform one step of the game.
 
-    :param ignored_enemy_chips: set of ignored enemy chips (distance to them 1 or less)
+    :param player:
     :param player int: Represents whether we're the first or second player
-    :param flags: bool, (center_flag, right_flag, left_flag, up_flag, bottom_flag)
     """
+    move = None
     height = parse_field_info()
     table = parse_field(height)
     figure, offset = parse_figure(player)
-    placement_coords, flags = choose_placement(table, figure, player, flags)
+    placement_coords = choose_placement(table, figure, player)
     if placement_coords == -1:
         debug("Error! There is no way to place this figure right!")
-        return [(0,0),0]
-    return list((placement_coords[0]-offset[0], placement_coords[1]-offset[1])), flags
+        return [0,0]
+    return list((placement_coords[0]-offset[0], placement_coords[1]-offset[1]))
 #
 #
 def play(player: int):
     """
     Main game loop.
-    :param player: int, Represents whether we're the first or second player
+
+    :param player int: Represents whether we're the first or second player
     """
-    flags = False,False,False,False,False
     while True:
-        move, flags = step(player, flags)
+        move = step(player)
         #time.sleep(0.5)
         print(*move)
 
@@ -448,12 +383,12 @@ if __name__ == "__main__":
     #                                              ['.','.','O','.','.',],
     #                                              ['.','.','.','.','.',],
     #                                              ['.','.','.','.','.',]]))
-    # print(choose_placement([['.','X','.','.','.',],
-    #                         ['.','.','.','.','.',],
-    #                         ['O','O','O','O','.',],
-    #                         ['.','.','.','.','.',],
-    #                         ['.','.','.','.','.',]], [['O'],
-    #                                                   ['O']], 1))
+    # print(choose_placement( [['.','X','.','.','.',],
+    #                          ['.','.','.','O','.',],
+    #                          ['.','O','O','O','.',],
+    #                          ['.','.','.','.','.',],
+    #                          ['.','.','.','.','.',]], [['.', 'O', '.'],
+    #                                                    ['.', 'O', '.']], 1))
     # print(cut_figure([['.','.','.','.','.'],
     #                   ['.','.','.','O','.'],
     #                   ['.','.','O','O','.'],
